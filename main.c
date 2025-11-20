@@ -1,391 +1,360 @@
-#include <libwebsockets.h>
-#include <string.h>
+#define INPROC_URL "inproc://rot13"
+#define REST_URL "http://127.0.0.1:%u/api/rest/rot13"
+#define SERVER_PORT "8080"
+#define MAC_ADDR_LEN 18             // "XX:XX:XX:XX:XX:XX\0"
+#define MAX_BUFFER_SIZE 10          // Configurable length for the reading buffer
+#define HIGH_VOLTAGE_THRESHOLD 3.8  // Voltage ratio threshold for events
+#define KILO_BYTES 1024
+
+#include <nng/http.h>
+#include <nng/nng.h>
+
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
+#include <string.h>
 
-// --- Data Structures for Storage ---
-
-#define MAX_MAC_LEN 18 // XX:XX:XX:XX:XX:XX + '\0'
-
-// Structure to hold sensor data
-typedef struct sensor_data {
-    char mac_address[MAX_MAC_LEN];
-    float v1, v2, v3;
-    float angle;
-    float speed;
-    float internal_temp;
-    float external_temp;
-    struct sensor_data *next;
-} sensor_data_t;
-
-// Global storage: simple linked list head
-static sensor_data_t *global_data_store = NULL;
-// Mutex to protect the shared global_data_store (crucial in LWS multi-threaded context)
-static pthread_mutex_t *data_store_mutex = NULL;
-
-// --- Helper Functions ---
-
-// Function to validate MAC address format
-static int validate_mac(const char *mac) {
-    if (!mac || strlen(mac) != 17) {
-        return 0;
-    }
-    // Basic check for XX:XX:XX:XX:XX:XX pattern (can be more rigorous)
-    for (int i = 0; i < 17; i++) {
-        if (i % 3 == 2) {
-            if (mac[i] != ':') return 0;
-        } else {
-            if (!((mac[i] >= '0' && mac[i] <= '9') ||
-                  (mac[i] >= 'a' && mac[i] <= 'f') ||
-                  (mac[i] >= 'A' && mac[i] <= 'F'))) {
-                return 0;
-            }
-        }
-    }
-    return 1;
+// utility function
+void fatal(const char *what, int rv)
+{
+    if (rv == 0) return;
+    fprintf(stderr, "%s: %s\n", what, nng_strerror(rv));
+    exit(EXIT_FAILURE);
 }
 
-// Finds data by MAC address (under the assumption that the mutex is already locked)
-static sensor_data_t *find_data_by_mac_unlocked(const char *mac) {
-    sensor_data_t *current = global_data_store;
-    while (current) {
-        if (strcmp(current->mac_address, mac) == 0) {
-            return current;
+// This server acts as a proxy.  We take HTTP POST requests, convert them to
+// REQ messages, and when the reply is received, send the reply back to
+// the original HTTP client.
+//
+// The state flow looks like:
+//
+// 1. Receive HTTP request & headers
+// 2. Receive HTTP request (POST) data
+// 3. Send POST payload as REQ body
+// 4. Receive REP reply (including payload)
+// 5. Return REP message body to the HTTP server (which forwards to client)
+// 6. Restart at step 1.
+//
+// The above flow is pretty linear, and so we use contexts (nng_ctx) to
+// obtain parallelism.
+
+typedef enum {
+    SEND_REQ, // Sending REQ request
+    RECV_REP, // Receiving REQ reply
+} job_state;
+
+typedef struct rest_job {
+    nng_aio         *http_aio; // aio from HTTP we must reply to
+    job_state        state;    // 0 = sending, 1 = receiving
+    nng_msg         *msg;      // request message
+    nng_aio         *aio;      // request flow
+    nng_ctx          ctx;      // context on the request socket
+    nng_http        *conn;
+    struct rest_job *next; // next on the freelist
+} rest_job;
+
+// Structure for a single sensor reading
+typedef struct {
+    double v_ratio1;
+    double v_ratio2;
+    double v_ratio3;
+    double temp1;
+    double temp2;
+    time_t timestamp;
+} SensorReading;
+
+// Structure for a threshold event
+typedef struct Event {
+    char mac_address[MAC_ADDR_LEN];
+    char message[128];
+    double value;
+    time_t timestamp;
+    struct Event *next;
+} Event;
+
+// Structure for managing a single device and its circular buffer
+typedef struct DeviceData {
+    char mac_address[MAC_ADDR_LEN];
+    SensorReading readings[MAX_BUFFER_SIZE];
+    int count;  // Current number of readings stored
+    int head;   // Index of the oldest reading (circular buffer head)
+    struct DeviceData *next;
+} DeviceData;
+
+nng_socket req_sock;
+
+// We maintain a queue of free jobs.  This way we don't have to
+// deallocate them from the callback; we just reuse them.
+nng_mtx  *job_lock;
+rest_job *job_freelist;
+
+// Global list heads
+DeviceData *g_devices = NULL;
+Event *g_events = NULL;
+
+// void inproc_server(void *arg);
+
+static void rest_job_cb(void *arg);
+
+/// @brief Finds a DeviceData structure by MAC address.
+/// @param mac The MAC address string.
+/// @return Pointer to DeviceData if found, otherwise NULL.
+DeviceData *find_device(const char *mac) {
+    DeviceData *curr = g_devices;
+    while (curr != NULL) {
+        if (strcmp(curr->mac_address, mac) == 0) {
+            return curr;
         }
-        current = current->next;
+        curr = curr->next;
     }
     return NULL;
 }
 
-// Stores or updates sensor data (under the assumption that the mutex is already locked)
-static void store_data_unlocked(sensor_data_t *new_data) {
-    sensor_data_t *existing = find_data_by_mac_unlocked(new_data->mac_address);
 
-    if (existing) {
-        // Update existing entry
-        existing->v1 = new_data->v1;
-        existing->v2 = new_data->v2;
-        existing->v3 = new_data->v3;
-        existing->angle = new_data->angle;
-        existing->speed = new_data->speed;
-        existing->internal_temp = new_data->internal_temp;
-        existing->external_temp = new_data->external_temp;
-        free(new_data); // Free the temporary new_data struct
+/// @brief Adds a new reading to a device's circular buffer and checks for events.
+/// @param device The device structure.
+/// @param reading The new sensor reading.
+void add_reading_and_check_events(DeviceData *device, const SensorReading *reading) {
+    // 1. Add reading to circular buffer
+    int idx = (device->head + device->count) % MAX_BUFFER_SIZE;
+    device->readings[idx] = *reading;
+    if (device->count < MAX_BUFFER_SIZE) {
+        device->count++;
     } else {
-        // New entry
-        new_data->next = global_data_store;
-        global_data_store = new_data;
+        // If buffer is full, move the head to overwrite the oldest element
+        device->head = (device->head + 1) % MAX_BUFFER_SIZE;
     }
-}
 
-// Function to safely extract a float value using sscanf from a JSON field
-static int extract_float(const char *json_data, const char *field, float *value) {
-    const char *start = strstr(json_data, field);
-    if (!start) return 0; // Field not found
-
-    // Move past the field name, colon, and initial spaces/quotes
-    start += strlen(field);
-    while (*start && (*start == ' ' || *start == ':')) start++;
-
-    // Attempt to read the float value
-    if (sscanf(start, "%f", value) == 1) {
-        return 1;
-    }
-    return 0; // Failed to parse float
-}
-
-// Function to safely extract a string value (MAC address)
-static int extract_string(const char *json_data, const char *field, char *buffer, size_t buffer_len) {
-    const char *start = strstr(json_data, field);
-    if (!start) return 0; // Field not found
-
-    // Move past the field name and colon
-    start += strlen(field);
-    while (*start && (*start == ' ' || *start == ':')) start++;
-
-    // Find the opening quote
-    const char *open_quote = strchr(start, '"');
-    if (!open_quote) return 0;
-    open_quote++;
-
-    // Find the closing quote
-    const char *close_quote = strchr(open_quote, '"');
-    if (!close_quote) return 0;
-
-    size_t len = close_quote - open_quote;
-    if (len >= buffer_len) return 0; // Buffer overflow
-
-    strncpy(buffer, open_quote, len);
-    buffer[len] = '\0';
-    return 1;
-}
-
-// --- Protocol Callback for /upload (Sensor Data Upload) ---
-
-static int callback_upload(struct lws *wsi, enum lws_callback_reasons reason,
-                           void *user, void *in, size_t len) {
-    char *response_msg = NULL;
-
-    switch (reason) {
-        case LWS_CALLBACK_ESTABLISHED:
-            lwsl_notice("Upload protocol established on /upload\n");
-            break;
-
-        case LWS_CALLBACK_RECEIVE: {
-            lwsl_notice("Received %lu bytes on /upload.\n", (unsigned long)len);
-
-            // 1. Allocate space for the new data structure
-            sensor_data_t *new_data = (sensor_data_t *)calloc(1, sizeof(sensor_data_t));
-            if (!new_data) {
-                lwsl_err("Failed to allocate memory for sensor data.\n");
-                response_msg = "{\"status\": \"error\", \"message\": \"Server allocation failed.\"}";
-                goto send_response;
-            }
-
-            char mac_buf[MAX_MAC_LEN] = {0};
-
-            // 2. Rudimentary JSON Parsing and Validation
-            // Note: In a production app, use a dedicated JSON library (e.g., cJSON)
-            if (!extract_string(in, "\"mac-address\"", mac_buf, sizeof(mac_buf)) ||
-                !extract_float(in, "\"v1\"", &new_data->v1) ||
-                !extract_float(in, "\"v2\"", &new_data->v2) ||
-                !extract_float(in, "\"v3\"", &new_data->v3) ||
-                !extract_float(in, "\"angle\"", &new_data->angle) ||
-                !extract_float(in, "\"speed\"", &new_data->speed) ||
-                !extract_float(in, "\"internal_temp\"", &new_data->internal_temp) ||
-                !extract_float(in, "\"external_temp\"", &new_data->external_temp)) {
-
-                lwsl_warn("Invalid JSON structure or missing fields received.\n");
-                response_msg = "{\"status\": \"error\", \"message\": \"Invalid or incomplete JSON data.\"}";
-                free(new_data);
-                goto send_response;
-            }
-
-            // 3. MAC Address Validation
-            if (!validate_mac(mac_buf)) {
-                lwsl_warn("Invalid MAC address format received: %s\n", mac_buf);
-                response_msg = "{\"status\": \"error\", \"message\": \"Invalid MAC address format.\"}";
-                free(new_data);
-                goto send_response;
-            }
-
-            // Copy validated MAC address to the struct
-            strncpy(new_data->mac_address, mac_buf, MAX_MAC_LEN);
-
-            // 4. Store Data (Thread-safe)
-            pthread_mutex_lock(data_store_mutex);
-            store_data_unlocked(new_data); // If updated, new_data is freed inside
-            pthread_mutex_unlock(data_store_mutex);
-
-            lwsl_notice("Data uploaded successfully for MAC: %s\n", new_data->mac_address);
-            response_msg = "{\"status\": \"success\", \"message\": \"Sensor data stored/updated.\"}";
-
-            break; // Data processing successful, don't jump to send_response yet
+    // 2. Check for threshold events (High Voltage Ratio 1)
+    if (reading->v_ratio1 > HIGH_VOLTAGE_THRESHOLD) {
+        Event *new_event = (Event *)malloc(sizeof(Event));
+        if (new_event == NULL) {
+            fprintf(stderr, "Error: Failed to allocate memory for event.\n");
+            return;
         }
 
+        // Populate event details
+        strncpy(new_event->mac_address, device->mac_address, MAC_ADDR_LEN);
+        snprintf(new_event->message, 128, "High Voltage Ratio (%.2f V) detected.", reading->v_ratio1);
+        new_event->value = reading->v_ratio1;
+        new_event->timestamp = reading->timestamp;
+        new_event->next = NULL;
+
+        // Add event to the global list (prepend for simplicity)
+        // pthread_mutex_lock(&g_data_mutex);
+        new_event->next = g_events;
+        g_events = new_event;
+        // pthread_mutex_unlock(&g_data_mutex);
+
+        printf("EVENT: %s - %s\n", new_event->mac_address, new_event->message);
+    }
+}
+
+/// @brief Utility to free the linked list of DeviceData.
+void free_devices() {
+    DeviceData *curr = g_devices;
+    while (curr != NULL) {
+        DeviceData *next = curr->next;
+        free(curr);
+        curr = next;
+    }
+    g_devices = NULL;
+}
+
+/// @brief Utility to free the linked list of Events.
+void free_events() {
+    Event *curr = g_events;
+    while (curr != NULL) {
+        Event *next = curr->next;
+        free(curr);
+        curr = next;
+    }
+    g_events = NULL;
+}
+
+static void rest_recycle_job(rest_job *job)
+{
+    if (job->msg != NULL) {
+        nng_msg_free(job->msg);
+        job->msg = NULL;
+    }
+    if (nng_ctx_id(job->ctx) != 0) {
+        nng_ctx_close(job->ctx);
+    }
+
+    nng_mtx_lock(job_lock);
+    job->next    = job_freelist;
+    job_freelist = job;
+    nng_mtx_unlock(job_lock);
+}
+
+static rest_job *rest_get_job(void) {
+    rest_job *job;
+
+    nng_mtx_lock(job_lock);
+    if ((job = job_freelist) != NULL) {
+        job_freelist = job->next;
+        nng_mtx_unlock(job_lock);
+        job->next = NULL;
+        return (job);
+    }
+    nng_mtx_unlock(job_lock);
+    if ((job = calloc(1, sizeof(*job))) == NULL) {
+        return (NULL);
+    }
+    if (nng_aio_alloc(&job->aio, rest_job_cb, job) != 0) {
+        free(job);
+        return (NULL);
+    }
+    return (job);
+}
+
+static void rest_http_fatal(rest_job *job, int rv) {
+    nng_aio *aio = job->http_aio;
+
+    // let the server give the details, we could have done more here
+    // ourselves if we wanted a detailed message
+    nng_aio_finish(aio, rv);
+    rest_recycle_job(job);
+}
+
+static void rest_job_cb(void *arg) {
+    rest_job *job = arg;
+    nng_aio  *aio = job->aio;
+    int       rv;
+
+    switch (job->state) {
+        case SEND_REQ:
+            if ((rv = nng_aio_result(aio)) != 0) {
+                rest_http_fatal(job, rv);
+                return;
+            }
+            job->msg = NULL;
+            // Message was sent, so now wait for the reply.
+            nng_aio_set_msg(aio, NULL);
+            job->state = RECV_REP;
+            nng_ctx_recv(job->ctx, aio);
+            break;
+        case RECV_REP:
+            if ((rv = nng_aio_result(aio)) != 0) {
+                rest_http_fatal(job, rv);
+                return;
+            }
+            job->msg = nng_aio_get_msg(aio);
+            // We got a reply, so give it back to the server.
+            rv = nng_http_copy_body(
+                    job->conn, nng_msg_body(job->msg), nng_msg_len(job->msg));
+            if (rv != 0) {
+                rest_http_fatal(job, rv);
+                return;
+            }
+            nng_http_set_status(job->conn, NNG_HTTP_STATUS_OK, NULL);
+            nng_aio_finish(job->http_aio, 0);
+            job->http_aio = NULL;
+            // We are done with the job.
+            rest_recycle_job(job);
+            return;
         default:
-            return 0;
+            fatal("bad case", NNG_ESTATE);
+            break;
     }
-
-    // Common point to send response after processing
-    if (response_msg) {
-        send_response:
-        // LWS requires a PADDING buffer for framing
-        size_t msg_len = strlen(response_msg);
-        unsigned char *p = (unsigned char *)malloc(LWS_PRE + msg_len + 1);
-        if (!p) {
-            lwsl_err("Failed to allocate response buffer.\n");
-            return -1;
-        }
-
-        memcpy(p + LWS_PRE, response_msg, msg_len);
-        p[LWS_PRE + msg_len] = '\0';
-
-        // Send the message as text
-        int written = lws_write(wsi, p + LWS_PRE, msg_len, LWS_WRITE_TEXT);
-        free(p);
-
-        if (written < (int)msg_len) {
-            lwsl_err("Error writing response.\n");
-        }
-    }
-
-    return 0;
 }
 
-// --- Protocol Callback for /data (Data Retrieval) ---
+// Our rest server just takes the message body, creates a request ID
+// for it, and sends it on.  This runs in raw mode, so
+void rest_handle(nng_http *conn, void *arg, nng_aio *aio)
+{
+    struct rest_job *job;
+    size_t           sz;
+    int              rv;
+    void            *data;
 
-static int callback_data(struct lws *wsi, enum lws_callback_reasons reason,
-                         void *user, void *in, size_t len) {
-
-    switch (reason) {
-        case LWS_CALLBACK_ESTABLISHED:
-            lwsl_notice("Data protocol established on /data\n");
-            break;
-
-        case LWS_CALLBACK_RECEIVE: {
-            // Received message should be the MAC address string
-            char mac_buf[MAX_MAC_LEN] = {0};
-            sensor_data_t *data = NULL;
-            char *response_msg = NULL;
-
-            // Ensure data is null-terminated and copy
-            if (len >= MAX_MAC_LEN - 1) {
-                response_msg = "{\"status\": \"error\", \"message\": \"MAC too long.\"}";
-                goto send_response;
-            }
-            strncpy(mac_buf, (const char *)in, len);
-            mac_buf[len] = '\0'; // Ensure termination
-
-            lwsl_notice("Received request for MAC: %s\n", mac_buf);
-
-            // 1. MAC Address Validation
-            if (!validate_mac(mac_buf)) {
-                lwsl_warn("Invalid MAC address format in request: %s\n", mac_buf);
-                response_msg = "{\"status\": \"error\", \"message\": \"Invalid MAC address format.\"}";
-                goto send_response;
-            }
-
-            // 2. Retrieve Data (Thread-safe)
-            pthread_mutex_lock(data_store_mutex);
-            data = find_data_by_mac_unlocked(mac_buf);
-            pthread_mutex_unlock(data_store_mutex);
-
-            // 3. Format Response
-            if (data) {
-                // Buffer for the JSON response
-                char json_buffer[512];
-                snprintf(json_buffer, sizeof(json_buffer),
-                         "{"
-                         "\"mac-address\": \"%s\","
-                         "\"v1\": %.2f,"
-                         "\"v2\": %.2f,"
-                         "\"v3\": %.2f,"
-                         "\"angle\": %.2f,"
-                         "\"speed\": %.2f,"
-                         "\"internal_temp\": %.2f,"
-                         "\"external_temp\": %.2f"
-                         "}",
-                         data->mac_address, data->v1, data->v2, data->v3,
-                         data->angle, data->speed, data->internal_temp, data->external_temp);
-                response_msg = json_buffer;
-            } else {
-                lwsl_notice("Data not found for MAC: %s\n", mac_buf);
-                response_msg = "{\"status\": \"not_found\", \"message\": \"No data found for this MAC address.\"}";
-            }
-
-            send_response:
-            // Send the response
-            size_t msg_len = strlen(response_msg);
-            unsigned char *p = (unsigned char *)malloc(LWS_PRE + msg_len + 1);
-            if (!p) {
-                lwsl_err("Failed to allocate response buffer.\n");
-                return -1;
-            }
-
-            memcpy(p + LWS_PRE, response_msg, msg_len);
-            p[LWS_PRE + msg_len] = '\0';
-
-            lws_write(wsi, p + LWS_PRE, msg_len, LWS_WRITE_TEXT);
-            free(p);
-            break;
-        }
-
-        default:
-            return 0;
+    if ((job = rest_get_job()) == NULL) {
+        nng_aio_finish(aio, NNG_ENOMEM);
+        return;
     }
-    return 0;
+    job->conn = conn;
+    if (((rv = nng_ctx_open(&job->ctx, req_sock)) != 0)) {
+        rest_recycle_job(job);
+        nng_aio_finish(aio, rv);
+        return;
+    }
+
+    nng_http_get_body(conn, &data, &sz);
+    job->http_aio = aio;
+
+    if ((rv = nng_msg_alloc(&job->msg, sz)) != 0) {
+        rest_http_fatal(job, rv);
+        return;
+    }
+    memcpy(nng_msg_body(job->msg), data, sz);
+    nng_aio_set_msg(job->aio, job->msg);
+    job->state = SEND_REQ;
+    nng_ctx_send(job->ctx, job->aio);
 }
-enum path_identifiers {UPLOAD, DATA};
-char *paths[] = {
-        "/upload",
-        "/data"
-};
-// --- Protocols Definition ---
 
-static struct lws_protocols protocols[] = {
-        {
-                "http-only",         // Name
-                lws_callback_http_dummy, // Callback
-                      0,                   // Per-session data size
-                         0,                   // Max frame size
-                0, 0, 0        // LWS_RX_FLOW_CONTROL_START, uxsh_flags, peer_bfo_max, *rx_bind_if
-        },
-        {
-                "sensor-upload-protocol", // Name
-                callback_upload,          // Callback function
-                      0,                        // Per-session data size
-                         4096,                     // Max frame size
-                0, 0,
-                UPLOAD,                // Path mapping for this protocol
-        },
-        {
-                "data-retrieval-protocol", // Name
-                callback_data,             // Callback function
-                      0,                         // Per-session data size
-                         4096,                      // Max frame size
-                0, 0,
-                DATA,                   // Path mapping for this protocol
-        },
-        { NULL, NULL, 0, 0 } /* terminator */
-};
+void rest_start(uint16_t port)
+{
+    nng_http_server *server;
+    nng_http_handler *handler;
+    char rest_addr[128];
+    nng_url *url;
 
-// --- Main Server Setup ---
+    fatal("nng_mtx_alloc", nng_mtx_alloc(&job_lock));
+    job_freelist = NULL;
 
-int main(int argc, const char **argv) {
-    struct lws_context_creation_info info;
-    struct lws_context *context;
-    const char *p;
-    int n = 0, logs = LLL_USER | LLL_ERR | LLL_WARN | LLL_NOTICE;
-    int port = 7681;
+    // Set up some strings, etc.  We use the port number
+    // from the argument list.
+    snprintf(rest_addr, sizeof(rest_addr), REST_URL, port);
+    fatal("nng_url_parse", nng_url_parse(&url, rest_addr));
 
-    // Set up logging
-    lws_set_log_level(logs, NULL);
+    // Create the REQ socket, and put it in raw mode, connected to
+    // the remote REP server (our inproc server in this case).
+    fatal("nng_req0_open", nng_req0_open(&req_sock));
+    //fatal("nng_dial(" INPROC_URL ")", nng_dial(req_sock, INPROC_URL, NULL, NNG_FLAG_NONBLOCK));
 
-    // Initialize global data store mutex
-    if (pthread_mutex_init(data_store_mutex, NULL)) {
-        lwsl_err("Failed to create mutex.\n");
-        return 1;
-    }
+    // Get a suitable HTTP server instance.  This creates one
+    // if it doesn't already exist.
+    fatal("nng_http_server_hold", nng_http_server_hold(&server, url));
 
-    // Zero-fill the context creation info struct
-    memset(&info, 0, sizeof(info));
-    info.port = port;
-    info.protocols = protocols;
-    info.gid = -1;
-    info.uid = -1;
-    info.options = LWS_SERVER_OPTION_ALLOW_HTTP_ON_HTTPS_LISTENER;
+    // Allocate the handler - we use a dynamic handler for REST
+    // using the function "rest_handle" declared above.
+    fatal("nng_http_handler_alloc", nng_http_handler_alloc(&handler, nng_url_path(url), rest_handle));
 
-    // Create the context
-    context = lws_create_context(&info);
-    if (!context) {
-        lwsl_err("lws init failed.\n");
-        pthread_mutex_destroy(data_store_mutex);
-        return 1;
-    }
+    nng_http_handler_set_method(handler, "POST");
 
-    lwsl_notice("Server started on port %d. Endpoints: /upload and /data\n", port);
-    lwsl_notice("Press Ctrl-C to exit...\n");
+    // We want to collect the body, and we (arbitrarily) limit this to
+    // 128KB.  The default limit is 1MB.  You can explicitly collect
+    // the data yourself with another HTTP read transaction by disabling
+    // this, but that's a lot of work, especially if you want to handle
+    // chunked transfers.
+    nng_http_handler_collect_body(handler, true, 128 * KILO_BYTES);
 
-    // Main event loop
-    while (n >= 0) {
-        n = lws_service(context, 50);
-    }
+    fatal("nng_http_handler_add_handler", nng_http_server_add_handler(server, handler));
+    fatal("nng_http_server_start", nng_http_server_start(server));
 
-    // Cleanup
-    lwsl_notice("LWS cleanup...\n");
-    lws_context_destroy(context);
-    pthread_mutex_destroy(data_store_mutex);
+    nng_url_free(url);
+}
 
-    // Free the linked list memory
-    sensor_data_t *current = global_data_store;
-    sensor_data_t *next;
-    while (current) {
-        next = current->next;
-        free(current);
-        current = next;
-    }
 
-    return 0;
+
+int main(int argc, char **argv)
+{
+    int rv;
+    // nng_thread *inproc_thr;
+    uint16_t port = 0;
+
+    fatal("cannot init NNG", nng_init(nullptr));
+    // rv = nng_thread_create(&inproc_thr, inproc_server, NULL);
+    // if (rv != 0) {fatal("cannot start inproc server", rv);}
+    if (getenv("PORT") != NULL) port = (uint16_t) atoi(getenv("PORT"));
+    port = port ? port : 8888;
+
+    /// Critical Path
+    rest_start(port);
+
+    // This runs forever.  The inproc_thr never exits, so we
+    // just block behind its condition variable.
+    // nng_thread_destroy(inproc_thr);
+    nng_fini();
 }

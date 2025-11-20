@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.31)
 project(firewatch C)
-
 set(CMAKE_C_STANDARD 23)
+find_package(nng CONFIG REQUIRED)
 add_executable(firewatch main.c)
 
-find_package(libwebsockets CONFIG REQUIRED)
-
-target_link_libraries(firewatch PRIVATE websockets_shared)
+target_link_libraries(firewatch PRIVATE nng::nng)
