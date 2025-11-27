@@ -15,7 +15,7 @@
 #include <string.h>
 
 // utility function
-void fatal(const char *what, int rv)
+void if_fatal(const char *what, int rv)
 {
     if (rv == 0) return;
     fprintf(stderr, "%s: %s\n", what, nng_strerror(rv));
@@ -207,6 +207,7 @@ static rest_job *rest_get_job(void) {
         return (NULL);
     }
     return (job);
+    nng_http_hand
 }
 
 static void rest_http_fatal(rest_job *job, int rv) {
@@ -336,25 +337,37 @@ void rest_start(uint16_t port)
     nng_url_free(url);
 }
 
-
+void handle_alpha(nng_http *connection, void *arg, nng_aio *async){}
 
 int main(int argc, char **argv)
 {
-    int rv;
+    int ret_val;
     // nng_thread *inproc_thr;
     uint16_t port = 0;
+    if_fatal("cannot init NNG", nng_init(nullptr));
 
-    fatal("cannot init NNG", nng_init(nullptr));
-    // rv = nng_thread_create(&inproc_thr, inproc_server, NULL);
-    // if (rv != 0) {fatal("cannot start inproc server", rv);}
     if (getenv("PORT") != NULL) port = (uint16_t) atoi(getenv("PORT"));
     port = port ? port : 8888;
 
-    /// Critical Path
-    rest_start(port);
+    nng_url *url;
+    ret_val = nng_url_parse(&url, "http://127.0.0.1:8888/submit");
+    if_fatal("", ret_val);
 
-    // This runs forever.  The inproc_thr never exits, so we
-    // just block behind its condition variable.
-    // nng_thread_destroy(inproc_thr);
+    nng_http_server *server;
+    ret_val = nng_http_server_hold(&server, url);
+    if_fatal("", ret_val);
+    /// Critical Path
+    nng_http_handler *handle;
+    ret_val = nng_http_handler_alloc(&handle, "submit", handle_alpha);
+    if_fatal("", ret_val);
+
+    nng_http_handler_set_method(handle, "POST");
+    nng_http_handler_collect_body(handle, true, 1024 * 1024);
+
+    ret_val = nng_http_server_add_handler(server, handle);
+    if_fatal("", ret_val);
+    ret_val = nng_http_server_start(server);
+    if_fatal("", ret_val);
+
     nng_fini();
 }
