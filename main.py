@@ -1,6 +1,6 @@
 import json
 import time
-from sensortest import get_temperature, get_humidity
+from internaltnh import get_temperature, get_humidity
 from getnetinf import get_mac
 
 def getSensorData():
