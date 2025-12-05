@@ -1,14 +1,19 @@
 import json
 import time
-from internaltnh import get_temperature, get_humidity
+#from internaltnh import get_itemp, get_ihumd
+import externaltnh
 from getnetinf import get_mac
 
-def getSensorData():
 
+def getSensorData():
+	time.sleep(1)
+	etemp, ehumd = externaltnh.sensor_oneshot()
 	data = {
 		"mac": get_mac(),
-		"itemp": float(f"{get_temperature():.2f}"),
-		"ihumd": float(f"{get_humidity():.2f}"),
+#		"itemp": float(f"{temp:.2f}"),
+		"etemp": float(f"{etemp:.2f}"),
+#		"ihumd": float(f"{humd:.2f}"),
+		"ehumd": float(f"{ehumd:.2f}")
 	}
 
 	with open("readings.json", "w") as f:
