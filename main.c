@@ -1,5 +1,4 @@
-#define REST_URL "http://127.0.0.1:%u/api/rest/rot13"
-#define SERVER_PORT "8080"
+#define SERVER_PORT "80"
 #define MAC_ADDR_LEN 18             // "XX:XX:XX:XX:XX:XX\0"
 #define MAX_BUFFER_SIZE 10          // Configurable length for the reading buffer
 #define HIGH_VOLTAGE_THRESHOLD 3.8  // Voltage ratio threshold for events
@@ -34,13 +33,13 @@ typedef struct Event {
 typedef struct DeviceData {
     char mac_address[MAC_ADDR_LEN];
     struct {
-        double v_ratio1;
-        double v_ratio2;
-        double v_ratio3;
-        double v_ratio4;
-        double v_ratio5;
-        double temp1;
-        double temp2;
+        double v_ratio1; // Humd
+        double v_ratio2; // CO2
+        double v_ratio3; // METH
+        double v_ratio4; // VOC
+        double v_ratio5; // SMOKE
+        double temp1; // Internal
+        double temp2; // External
         time_t timestamp;
     } readings[MAX_BUFFER_SIZE];
     int count;  // Current number of readings stored
@@ -50,7 +49,7 @@ typedef struct DeviceData {
 
 // Global list heads
 DeviceData *device_list = NULL;
-Event *g_events = NULL;
+Event *event_list = NULL, *event_tail = NULL;
 
 
 /// @brief Finds a DeviceData structure by MAC address.
@@ -75,6 +74,15 @@ DeviceData *find_device(const char *mac) {
     return curr->next;
 }
 
+void create_event() {
+    event_tail->next = malloc(sizeof(Event));
+    event_tail = event_tail->next;
+}
+
+void threshold_events(const char *mac) {
+    //if ()
+}
+
 /// @brief Handler for converting system state to application update packet
 /// @param conn The connection object used by nng to send packet info
 /// @param arg Extra parameters not yet used...
@@ -89,10 +97,12 @@ void handle_push(nng_http *conn, void *arg, nng_aio *async){
     double itemp, etemp, humd, co2, meth, voc, smoke;
 
     const char *scan_format =
-            "{ \"mac\": \"%17[^\"]\", \"itemp\": %f, \"etemp\": %f, \"humd\": %f, \"co2\": %f, \"meth\": %f, \"voc\": %f, \"smoke\": %f}";
+            "{ \"mac\": \"%17s\", \"itemp\": %f, \"etemp\": %f, \"humd\": %f, \"co2\": %f, \"meth\": %f, \"voc\": %f, \"smoke\": %f}";
 
     nng_http_get_body(conn, &data, &sz);
     int assignments = sscanf(data, scan_format, mac_address, &itemp, &etemp, &humd, &co2, &meth, &voc, &smoke);
+    if (assignments != 8) fprintf(stderr, "Error: JSON parsing failed. Expected 8 assignments, got %d.\n", assignments);
+
     mac_address[MAC_ADDR_LEN - 1] = '\0';
     device = find_device(mac_address);
 
@@ -107,8 +117,7 @@ void handle_push(nng_http *conn, void *arg, nng_aio *async){
 
     if (device->count < MAX_BUFFER_SIZE) device->count++;
     else device->head = (device->head + 1) % MAX_BUFFER_SIZE;
-
-    if (assignments != 8) fprintf(stderr, "Error: JSON parsing failed. Expected 8 assignments, got %d.\n", assignments);
+    // threshold_events(mac_address);
 
     nng_aio_finish(async, NNG_OK);
 }
