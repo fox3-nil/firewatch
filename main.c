@@ -21,16 +21,6 @@ void if_fatal(const char *what, int rv)
     exit(EXIT_FAILURE);
 }
 
-// Structure for a single sensor reading
-typedef struct {
-    double v_ratio1;
-    double v_ratio2;
-    double v_ratio3;
-    double temp1;
-    double temp2;
-    time_t timestamp;
-} SensorReading;
-
 // Structure for a threshold event
 typedef struct Event {
     char mac_address[MAC_ADDR_LEN];
@@ -43,90 +33,46 @@ typedef struct Event {
 // Structure for managing a single device and its circular buffer
 typedef struct DeviceData {
     char mac_address[MAC_ADDR_LEN];
-    SensorReading readings[MAX_BUFFER_SIZE];
+    struct {
+        double v_ratio1;
+        double v_ratio2;
+        double v_ratio3;
+        double v_ratio4;
+        double v_ratio5;
+        double temp1;
+        double temp2;
+        time_t timestamp;
+    } readings[MAX_BUFFER_SIZE];
     int count;  // Current number of readings stored
     int head;   // Index of the oldest reading (circular buffer head)
-    struct DeviceData *next;
+    struct DeviceData* next;
 } DeviceData;
 
 // Global list heads
-DeviceData *g_devices = NULL;
+DeviceData *device_list = NULL;
 Event *g_events = NULL;
+
 
 /// @brief Finds a DeviceData structure by MAC address.
 /// @param mac The MAC address string.
 /// @return Pointer to DeviceData if found, otherwise NULL.
 DeviceData *find_device(const char *mac) {
-    DeviceData *curr = g_devices;
-    while (curr != NULL) {
-        if (strcmp(curr->mac_address, mac) == 0) {
-            return curr;
-        }
+    DeviceData *curr = device_list;
+    // When the device list is empty
+    if (curr == NULL) {
+        device_list = malloc(sizeof (DeviceData));
+        strcpy(device_list->mac_address, mac);
+        return device_list;
+    }
+    // When the device is in a list
+    while (curr->next != NULL) {
+        if (strcmp(curr->next->mac_address, mac) == 0) return curr->next;
         curr = curr->next;
     }
-    return NULL;
-}
-
-
-/// @brief Adds a new reading to a device's circular buffer and checks for events.
-/// @param device The device structure.
-/// @param reading The new sensor reading.
-void add_reading_and_check_events(DeviceData *device, const SensorReading *reading) {
-    // 1. Add reading to circular buffer
-    int idx = (device->head + device->count) % MAX_BUFFER_SIZE;
-    device->readings[idx] = *reading;
-    if (device->count < MAX_BUFFER_SIZE) {
-        device->count++;
-    } else {
-        // If buffer is full, move the head to overwrite the oldest element
-        device->head = (device->head + 1) % MAX_BUFFER_SIZE;
-    }
-
-    // 2. Check for threshold events (High Voltage Ratio 1)
-    if (reading->v_ratio1 > HIGH_VOLTAGE_THRESHOLD) {
-        Event *new_event = (Event *)malloc(sizeof(Event));
-        if (new_event == NULL) {
-            fprintf(stderr, "Error: Failed to allocate memory for event.\n");
-            return;
-        }
-
-        // Populate event details
-        strncpy(new_event->mac_address, device->mac_address, MAC_ADDR_LEN);
-        snprintf(new_event->message, 128, "High Voltage Ratio (%.2f V) detected.", reading->v_ratio1);
-        new_event->value = reading->v_ratio1;
-        new_event->timestamp = reading->timestamp;
-        new_event->next = NULL;
-
-        // Add event to the global list (prepend for simplicity)
-        // pthread_mutex_lock(&g_data_mutex);
-        new_event->next = g_events;
-        g_events = new_event;
-        // pthread_mutex_unlock(&g_data_mutex);
-
-        printf("EVENT: %s - %s\n", new_event->mac_address, new_event->message);
-    }
-}
-
-/// @brief Utility to free the linked list of DeviceData.
-void free_devices() {
-    DeviceData *curr = g_devices;
-    while (curr != NULL) {
-        DeviceData *next = curr->next;
-        free(curr);
-        curr = next;
-    }
-    g_devices = NULL;
-}
-
-/// @brief Utility to free the linked list of Events.
-void free_events() {
-    Event *curr = g_events;
-    while (curr != NULL) {
-        Event *next = curr->next;
-        free(curr);
-        curr = next;
-    }
-    g_events = NULL;
+    // When the device is not present
+    curr->next = malloc(sizeof(DeviceData));
+    strcpy(curr->next->mac_address, mac);
+    return curr->next;
 }
 
 /// @brief Handler for converting system state to application update packet
@@ -137,19 +83,33 @@ void handle_push(nng_http *conn, void *arg, nng_aio *async){
     size_t           sz;
     int              rv;
     void            *data;
-    DeviceData receipt;
+    DeviceData *device;
+
+    char mac_address[MAC_ADDR_LEN];
+    double itemp, etemp, humd, co2, meth, voc, smoke;
+
+    const char *scan_format =
+            "{ \"mac\": \"%17[^\"]\", \"itemp\": %f, \"etemp\": %f, \"humd\": %f, \"co2\": %f, \"meth\": %f, \"voc\": %f, \"smoke\": %f}";
 
     nng_http_get_body(conn, &data, &sz);
-    const char *scan_format = "{ "
-                              "\"mac\": \"%.17s\", "
-                              "\"itemp\": %f, "
-                              "\"etemp\": %f, "
-                              "\"humd\": %f, "
-                              "\"co2\": %f, "
-                              "\"meth\": %f, "
-                              "\"voc\": %f, "
-                              "\"smoke\": %f}";
-    fscanf(data, scan_format, receipt.mac_address, receipt.readings[0].temp1, receipt.readings[0].temp2);
+    int assignments = sscanf(data, scan_format, mac_address, &itemp, &etemp, &humd, &co2, &meth, &voc, &smoke);
+    mac_address[MAC_ADDR_LEN - 1] = '\0';
+    device = find_device(mac_address);
+
+    int idx = (device->head + device->count) % MAX_BUFFER_SIZE;
+    device->readings[idx].temp1 = itemp;
+    device->readings[idx].temp2 = etemp;
+    device->readings[idx].v_ratio1 = humd;
+    device->readings[idx].v_ratio2 = co2;
+    device->readings[idx].v_ratio3 = meth;
+    device->readings[idx].v_ratio4 = voc;
+    device->readings[idx].v_ratio5 = smoke;
+
+    if (device->count < MAX_BUFFER_SIZE) device->count++;
+    else device->head = (device->head + 1) % MAX_BUFFER_SIZE;
+
+    if (assignments != 8) fprintf(stderr, "Error: JSON parsing failed. Expected 8 assignments, got %d.\n", assignments);
+
     nng_aio_finish(async, NNG_OK);
 }
 
@@ -167,13 +127,20 @@ void handle_pull(nng_http *conn, void *arg, nng_aio *async){
     const char *uri = nng_http_get_uri(conn);
     nng_url *url;
     nng_url_parse(&url, uri);
-    const char *path = nng_url_path(url);
-    //char *mac = strchr(path, '/'), *mac_end = strchr(mac, '/');
-    //printf("%.14s", mac);
-
-    nng_http_set_body(conn, "{ \"mac\": \"xx:xx:xx:xx:xx:xx\", \"itemp\": 0.00, \"etemp\": 0.00, \"humd\": 0.00, \"co2\": 0.00, \"meth\": 0.00, \"voc\": 0.00, \"smoke\": 0.00}\n", 129);
-    nng_http_set_status(conn, NNG_HTTP_STATUS_OK, nullptr);
+    char * body = malloc(300);
+    const char *format = "{ \"mac\": \"%17s\", \"itemp\": %5.2f, \"etemp\": %5.2f, \"humd\": %3.2f, \"co2\": %3.2f, \"meth\": %3.2f, \"voc\": %3.2f, \"smoke\": %3.2f}\n";
+    sprintf(body, format,
+            device_list->readings[0].temp1,
+            device_list->readings[0].temp2,
+            device_list->readings[0].v_ratio1,
+            device_list->readings[0].v_ratio2,
+            device_list->readings[0].v_ratio3,
+            device_list->readings[0].v_ratio4,
+            device_list->readings[0].v_ratio5);
+    nng_http_set_body(conn, body, strlen(body));
+    nng_http_set_status(conn, NNG_HTTP_STATUS_OK, NULL);
     nng_aio_finish(async, NNG_OK);
+    free(body);
 }
 
 int main(int argc, char **argv)
@@ -182,9 +149,9 @@ int main(int argc, char **argv)
     nng_http_server *server;
     nng_http_handler *push_callback, *pull_callback, *index_callback, *dir_callback;
 
-    if_fatal("cannot init NNG", nng_init(nullptr));
+    if_fatal("cannot init NNG", nng_init(NULL));
 
-    if_fatal("url_parse", nng_url_parse(&url, "http://127.0.0.1:8888"));
+    if_fatal("url_parse", nng_url_parse(&url, "http://172.31.7.192:80"));
     if_fatal("server_hold", nng_http_server_hold(&server, url));
 
     if_fatal("handler_alloc", nng_http_handler_alloc(&push_callback, "/submit", handle_push));
