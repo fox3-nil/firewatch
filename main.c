@@ -128,15 +128,18 @@ void handle_pull(nng_http *conn, void *arg, nng_aio *async){
     nng_url *url;
     nng_url_parse(&url, uri);
     char * body = malloc(300);
-    const char *format = "{ \"mac\": \"%17s\", \"itemp\": %5.2f, \"etemp\": %5.2f, \"humd\": %3.2f, \"co2\": %3.2f, \"meth\": %3.2f, \"voc\": %3.2f, \"smoke\": %3.2f}\n";
-    sprintf(body, format,
-            device_list->readings[0].temp1,
-            device_list->readings[0].temp2,
-            device_list->readings[0].v_ratio1,
-            device_list->readings[0].v_ratio2,
-            device_list->readings[0].v_ratio3,
-            device_list->readings[0].v_ratio4,
-            device_list->readings[0].v_ratio5);
+    if(device_list == NULL) strcpy(body, "{\"no_val\": 0}");
+    else {
+        const char *format = "{ \"mac\": \"%17s\", \"itemp\": %5.2f, \"etemp\": %5.2f, \"humd\": %3.2f, \"co2\": %3.2f, \"meth\": %3.2f, \"voc\": %3.2f, \"smoke\": %3.2f}\n";
+        sprintf(body, format,
+                device_list->readings[0].temp1,
+                device_list->readings[0].temp2,
+                device_list->readings[0].v_ratio1,
+                device_list->readings[0].v_ratio2,
+                device_list->readings[0].v_ratio3,
+                device_list->readings[0].v_ratio4,
+                device_list->readings[0].v_ratio5);
+    }
     nng_http_set_body(conn, body, strlen(body));
     nng_http_set_status(conn, NNG_HTTP_STATUS_OK, NULL);
     nng_aio_finish(async, NNG_OK);
