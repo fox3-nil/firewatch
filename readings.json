@@ -1,5 +1,8 @@
 {
     "mac": "dc:a6:32:1a:f6:40",
-    "itemp": 21.69,
-    "ihumd": 25.07
+    "itemp": 23.08,
+    "etemp": 23.19,
+    "ihumd": 28.2,
+    "ehumd": 29.09,
+    "snapshot": ""
 }
