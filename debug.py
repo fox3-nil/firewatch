@@ -13,7 +13,6 @@ def get_sensor_values():
 	aht20_t = internaltnh.get_temperature()
 	aht20_h = internaltnh.get_humidity()
 	cht832x_t, cht832x_h = externaltnh.sensor_oneshot()
-
 	#aht20_t = random.randint(20, 25)
 	#aht20_h = random.randint(45, 55)
 	#cht832x_t = random.randint(10, 15)
@@ -30,8 +29,8 @@ def main():
 
 		clear_screen()
 		print("=== SENSOR DEBUGGING TEST ===")
-		print(f"AHT20 Temperature:     {itemp} °C")
-		print(f"AHT20 Humidity:        {ihumd} %")
+		print(f"AHT20 Temperature:     {itemp: .2f} °C")
+		print(f"AHT20 Humidity:        {ihumd: .2f} %")
 		print(f"CHT832X Temperature:   {etemp} °C")
 		print(f"CHT832X Humidity:      {ehumd} %")
 		print(f"Fermion VOC Vout:      {vocs:.2f} V")
