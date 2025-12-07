@@ -6,12 +6,15 @@ from getnetinf import get_mac
 from camera import camera
 import base64
 import string
+from  thermal_cam import thermal_camera
 
 def getSensorData():
 	time.sleep(1)
 	itemp = get_temperature()
 	ihumd = get_humidity()
 	etemp, ehumd = externaltnh.sensor_oneshot()
+	thermal_cam = thermal_camera()
+	tc_frame = thermal_cam.mlx_frame()
 	snapshot = camera.capture_photo()
 	data = {
 		"mac": get_mac(),
@@ -19,6 +22,7 @@ def getSensorData():
 		"etemp": float(f"{etemp:.2f}"),
 		"ihumd": float(f"{ihumd:.2f}"),
 		"ehumd": float(f"{ehumd:.2f}"),
+		"thermal_cam": tc_frame,
 		"snapshot": snapshot
 	}
 

@@ -25,9 +25,10 @@ class camera:
 		time.sleep(2)
 		try:
 			stream = io.BytesIO()
-            picam.capture_file(stream, format="jpeg")
-            	
-            stream.seek(0)
+			picam.capture_file(stream, format="jpeg")
+
+			stream.seek(0)
+
 			image_data = stream.getvalue()
 
 			base64_bytes = base64.b64encode(image_data)
@@ -42,7 +43,7 @@ class camera:
 
 	def video_stream():
 		picam2 = Picamera2()
-		
+
     		#RTMP_URL = "rtmp://x.x.x.x/live/mystream"
 		UDP_URL = "udp://192.168.1.50:1234"
 		WIDTH = 1280
