@@ -28,10 +28,10 @@ source "$VENV_DIR/bin/activate"
 echo "Python executable now: $(which python3)"
 
 echo "[3/6] Updating apt..."
-apt update
+sudo apt update
 
 echo "[4/6] Installing system packages..."
-apt install -y python3-pip python3-smbus i2c-tools libatlas-base-dev python3-pil libcamera-tools python3-libcamera
+sudo apt install -y python3-pip python3-smbus i2c-tools python3-pil libcamera-tools python3-libcamera
 
 echo "[5/6] Upgrading pip..."
 pip3 install --upgrade pip
