@@ -12,11 +12,12 @@ def get_sensor_values():
 	#THIS IS WHERE YOU READ SENSOR VALUES AND VERIFY THEIR OUTPUT
 	aht20_t = internaltnh.get_temperature()
 	aht20_h = internaltnh.get_humidity()
+	cht832x_t, cht832x_h = externaltnh.sensor_oneshot()
 	
 	#aht20_t = random.randint(20, 25)
 	#aht20_h = random.randint(45, 55)
-	cht832x_t = random.randint(10, 15)
-	cht832x_h = random.randint(55, 65)
+	#cht832x_t = random.randint(10, 15)
+	#cht832x_h = random.randint(55, 65)
 	fermion_voc = random.uniform(0.4, 3.3)
 	fermion_meth = random.uniform(0.4, 3.3)
 	fermion_smoke = random.uniform(0.4, 3.3)
