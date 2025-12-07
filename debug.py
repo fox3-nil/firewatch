@@ -29,8 +29,8 @@ def main():
 
 		clear_screen()
 		print("=== SENSOR DEBUGGING TEST ===")
-		print(f"AHT20 Temperature:     {itemp} °C")
-		print(f"AHT20 Humidity:        {ihumd} %")
+		print(f"AHT20 Temperature:     {itemp: .2f} °C")
+		print(f"AHT20 Humidity:        {ihumd: .2f} %")
 		print(f"CHT832X Temperature:   {etemp} °C")
 		print(f"CHT832X Humidity:      {ehumd} %")
 		print(f"Fermion VOC Vout:      {vocs:.2f} V")
