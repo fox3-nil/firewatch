@@ -17,7 +17,7 @@ class camera:
 
 	def capture_photo():
 		#Configure the selected piCam for photos
-    		#Let the camera 'wake up' before taking the photo
+    	#Let the camera 'wake up' before taking the photo
 		picam = Picamera2()
 		pic_config = picam.create_still_configuration()
 		picam.configure(pic_config)
@@ -25,8 +25,9 @@ class camera:
 		time.sleep(2)
 		try:
 			stream = io.BytesIO()
-
-			stream.seek(0)
+            picam.capture_file(stream, format="jpeg")
+            	
+            stream.seek(0)
 			image_data = stream.getvalue()
 
 			base64_bytes = base64.b64encode(image_data)
