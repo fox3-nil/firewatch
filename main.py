@@ -8,6 +8,8 @@ from thermal_cam import thermal_camera
 import base64
 import string
 
+#test comment
+
 def getSensorData(NoIR,MLX):
 	time.sleep(1)
 	itemp = get_temperature()
