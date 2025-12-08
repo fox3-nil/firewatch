@@ -15,19 +15,18 @@ class camera:
 
 	'''
 
-	def capture_photo():
-		#Configure the selected piCam for photos
-    	#Let the camera 'wake up' before taking the photo
-		picam = Picamera2()
-		pic_config = picam.create_still_configuration()
-		picam.configure(pic_config)
-		picam.start()
+	def __init__(self):
+		self.picam = Picamera2()
+		self.still_config = self.picam.create_still_configuration(main={"size": (1920, 1080)})
+
+	def capture_photo(self):
+		self.picam.configure(self.still_config)
+		self.picam.start()
 		time.sleep(2)
 		try:
 			stream = io.BytesIO()
-            picam.capture_file(stream, format="jpeg")
-            	
-            stream.seek(0)
+			self.picam.capture_file(stream, format="jpeg")
+			stream.seek(0)
 			image_data = stream.getvalue()
 
 			base64_bytes = base64.b64encode(image_data)
@@ -37,13 +36,10 @@ class camera:
 			return base64_string
 
 		finally:
-			picam.stop()
-			picam.close()
+			self.picam.stop()
 
 	def video_stream():
-		picam2 = Picamera2()
-		
-    		#RTMP_URL = "rtmp://x.x.x.x/live/mystream"
+		#RTMP_URL = "rtmp://x.x.x.x/live/mystream"
 		UDP_URL = "udp://192.168.1.50:1234"
 		WIDTH = 1280
 		HEIGHT = 720
