@@ -17,6 +17,7 @@ def get_sensor_values():
 #	aht20_t = internaltnh.get_temperature()
 #	aht20_h = internaltnh.get_humidity()
 #	cht832x_t, cht832x_h = externaltnh.sensor_oneshot()
+#	fermion_co, fermion_voc, fermion_smoke, fermion_methane = memssuite_probe.memssuite()
 	aht20_t = random.uniform(20.00, 55.00)
 	aht20_h = random.uniform(45.00, 47.00)
 	cht832x_t = random.uniform(10, 15)
@@ -25,7 +26,8 @@ def get_sensor_values():
 	fermion_meth = random.uniform(0.4, 3.3)
 	fermion_smoke = random.uniform(0.4, 3.3)
 	fermion_co = random.uniform(0.4, 3.3)
-	return aht20_t, aht20_h, cht832x_t, cht832x_h, fermion_voc, fermion_meth, fermion_smoke, fermion_co
+	batterylvl = random.randint(1, 100)
+	return aht20_t, aht20_h, cht832x_t, cht832x_h, fermion_voc, fermion_meth, fermion_smoke, fermion_co, batterylvl
 
 def main():
 
@@ -35,7 +37,7 @@ def main():
 
 	try:
 		while True:
-			itemp, ihumd, etemp, ehumd, vocs, methane, smoke, carbmono = get_sensor_values()
+			itemp, ihumd, etemp, ehumd, vocs, methane, smoke, carbmono, battery = get_sensor_values()
 
 			clear_screen()
 			print("=== SENSOR DEBUGGING TEST ===")
@@ -46,7 +48,8 @@ def main():
 			print(f"Fermion VOC Vout:      {vocs:.2f} V")
 			print(f"Fermion Methane Vout:  {methane:.2f} V")
 			print(f"Fermion Smoke Vout:    {smoke:.2f} V")
-			print(f"Fermion CO Vout:       {carbmono:.2f} V\n")
+			print(f"Fermion CO Vout:       {carbmono:.2f} V")
+			print(f"Battery Level:         {battery} %\n")
 			print("      === RESULTS ===")
 			if itemp <= 51.66:
 				print("AHT20 Temperature ==============", GREEN + " [PASSED]" + RESET)
@@ -64,7 +67,7 @@ def main():
 				print("METHANE V OUTPUT ===============", GREEN + " [PASSED]" + RESET)
 			else:
 				print("METHANE V OUTPUT ===============", YELLOW + " [WARNING]" + RESET)
-			if 0.00 <= smoke <= 2.5:
+			if 0.00 <= smoke <= 2.50:
 				print("SMOKE V OUTPUT =================", GREEN + " [PASSED]" + RESET)
 			else:
 				print("SMOKE V OUTPUT =================", YELLOW + " [WARNING]" + RESET)
