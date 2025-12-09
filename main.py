@@ -87,7 +87,7 @@ def main(argv):
 
 			getSensorData(picam3, thermal_cam)
 			
-			time.sleep(5)
+			time.sleep(10)
 
 
 	except KeyboardInterrupt:
