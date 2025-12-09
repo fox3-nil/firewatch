@@ -105,7 +105,7 @@ class camera:
 				self.picam.close()
 				process.terminate()
 
-		def send_video(server_url, duration=30):
+		def send_video(server_url, duration=5):
 			filename = f"video_{int(time.time())}.mp4"
 			filepath = os.path.join("/tmp", filename)
 

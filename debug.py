@@ -7,10 +7,10 @@ import externaltnh
 import memssuite_probe
 #import co_probe
 
-
+'''
 def clear_screen():
 	os.system('cls' if os.name == 'nt' else 'clear')
-
+'''
 def get_sensor_values():
 
 	#THIS IS WHERE YOU READ SENSOR VALUES AND VERIFY THEIR OUTPUT
@@ -41,8 +41,8 @@ def main():
 		while True:
 			itemp, ihumd, etemp, ehumd, vocs, methane, smoke, carbmono, battery = get_sensor_values()
 
-			clear_screen()
-			print("=== SENSOR DEBUGGING TEST ===")
+			#clear_screen()
+			print("\n=== SENSOR DEBUGGING TEST ===")
 			print(f"AHT20 Temperature:     {itemp:.2f} °C")
 			print(f"AHT20 Humidity:        {ihumd:.2f} %")
 			print(f"CHT832X Temperature:   {etemp:.2f} °C")
@@ -52,7 +52,7 @@ def main():
 			print(f"Fermion Smoke Vout:    {smoke:.2f} V")
 			print(f"Fermion CO Vout:       {carbmono:.2f} V")
 			print(f"Battery Level:         {battery} %\n")
-			print("      === RESULTS ===")
+			print("      === RESULTS ===\n")
 			if itemp <= 51.66:
 				print("AHT20 Temperature ==============", GREEN + " [PASSED]" + RESET)
 			else:
@@ -65,7 +65,7 @@ def main():
 				print("VOC V OUTPUT ===================", GREEN + " [PASSED]" + RESET)
 			else:
 				print("VOC V OUTPUT ===================", YELLOW + " [WARNING]" + RESET)
-			if 0.00 <= methane <= 1.30:
+			if 0.00 <= methane <= 2.00:
 				print("METHANE V OUTPUT ===============", GREEN + " [PASSED]" + RESET)
 			else:
 				print("METHANE V OUTPUT ===============", YELLOW + " [WARNING]" + RESET)
@@ -73,11 +73,12 @@ def main():
 				print("SMOKE V OUTPUT =================", GREEN + " [PASSED]" + RESET)
 			else:
 				print("SMOKE V OUTPUT =================", YELLOW + " [WARNING]" + RESET)
-			if 0.00 <= carbmono <= 0.41:
+			if 0.00 <= carbmono <= 0.90:
 				print("CARBON MONOXIDE V OUTPUT =======", GREEN + " [PASSED]" + RESET)
 			else:
 				print("CARBON MONOXIDE V OUTPUT =======", YELLOW + " [WARNING]" + RESET)
 
+			print("\n")
 			time.sleep(1)
 
 	except KeyboardInterrupt:

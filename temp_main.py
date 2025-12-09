@@ -9,13 +9,11 @@ from thermal_cam import thermal_camera
 import base64
 import string
 import memssuite_probe
-import sys
 #import anemometer
 
 #test comment
 
-#SERVER_URL = "http://f-star.org:8080"
-SERVER_URL = "http://10.125.161.153:8080"
+SERVER_URL = "https://f-star.org:8443"
 
 
 def getSensorData(NoIR,MLX):
@@ -32,27 +30,22 @@ def getSensorData(NoIR,MLX):
 	'''
 	data = {
 		"mac": get_mac(),
-		"temp_internal_c": float(f"{itemp:.2f}"),
-		"temp_external_c": float(f"{etemp:.2f}"),
-		"humd_internal_per": float(f"{ihumd:.2f}"),
-		"humd_external_per": float(f"{ehumd:.2f}"),
-		"co_v": float(f"{carbmono:.2f}"),
-		"voc_v": float(f"{vocs:.2f}"),
-		"smoke_v": float(f"{smoke:.2f}"),
-		"methane_v": float(f"{ch4:.2f}"),
+		"itemp": float(f"{itemp:.2f}"),
+		"etemp": float(f"{etemp:.2f}"),
+		"ihumd": float(f"{ihumd:.2f}"),
+		"ehumd": float(f"{ehumd:.2f}"),
+		"carbmono": float(f"{carbmono:.2f}"),
+		"vocs": float(f"{vocs:.2f}"),
+		"smoke": float(f"{smoke:.2f}"),
+		"ch4": float(f"{ch4:.2f}"),
 		"thermal_cam": mlx_data,
-		"recent_image_data": snapshot,
-		"latitude": 00.000,
-		"longitude": 0.000,
-		"wind_speed_mph": 100,
-		"timestamp": "2025-12-09T02:25:00.000Z"
+		"snapshot": snapshot
 	}
 
 	with open("readings.json", "w") as f:
 		json.dump(data, f, indent=4)
 
 	try:
-		print(f"Connecting to {SERVER_URL}")
 		response = requests.post(SERVER_URL,json=data)
 
 		if response.status_code == 200:
@@ -64,7 +57,7 @@ def getSensorData(NoIR,MLX):
 		print(f"An error occurred during the request: {e}")
 
 
-def main(argv):
+def main():
 	picam3 = camera()
 	thermal_cam = thermal_camera()
 	try:
@@ -81,11 +74,7 @@ def main(argv):
 		while True:
 
 			getSensorData(picam3, thermal_cam)
-			if(sys.argv[1] == "record"):
-				print("Recording...")
-				camera.send_video(SERVER_URL, 5)
 			time.sleep(0.5)
-
 
 	except KeyboardInterrupt:
 		print("Shutting down system")
@@ -96,5 +85,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
-	main(sys.argv)
+	main()
 
