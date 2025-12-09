@@ -82,59 +82,37 @@ class camera:
 
 			try:
 				# 4. The Loop: Capture and Write
-				# We start recording directly to the FFmpeg process's stdin
-				# 'format="h264"' ensures the Pi hardware does the compression
-				picam2.start_recording(process.stdin, format="h264")
+				# W
+	def send_video(self, server_url, duration=5):
+		filename = f"video_{int(time.time())}.mp4"
+		filepath = os.path.join("/tmp", filename)
 
-				# Keep the script running while recording happens in the background
-				while True:
-					time.sleep(1)
-					# Optional: Check if ffmpeg crashed
-					if process.poll() is not None:
-						print("FFmpeg process exited unexpectedly.")
-					break
+		try:
+			self.picam.configuration(self.video_config)
+			self.picam.start_recording(filepath, format="mp4") #mp4 video
+			self.picam.wait(duration) #record for duration
+			self.picam.stop_recording()
 
-			except KeyboardInterrupt:
-				print("\nStopping stream...")
-			except BrokenPipeError:
-				print("FFmpeg pipe closed (server disconnected?)")
-			finally:
-				# 5. Cleanup
-				self.picam.stop_recording()
-				self.picam.stop()
-				self.picam.close()
-				process.terminate()
+		except Exception as e:
+			print(f"Error during recording: {e}")
+			return
+		finally:
+			self.picam.stop()
 
-		def send_video(server_url, duration=5):
-			filename = f"video_{int(time.time())}.mp4"
-			filepath = os.path.join("/tmp", filename)
+		print(f"Uploading to {server_url}..")
 
-			try:
-				self.picam.configuration(self.video_config)
-				self.picam.start_recording(filepath, format="mp4") #mp4 video
-				self.picam.wait(duration)#record for duration
-				self.picam.stop_recording()
+		try:
+			with open(filepath, 'rb') as f:
+				files = {'file': (filename, f, 'video/mp4')}
+				response = requests.post(server_url, files=files, timeout=60)
 
-			except Exception as e:
-				print(f"Error during recording: {e}")
-				return
-			finally:
-				self.picam.stop()
-
-			print(f"Uploading to {server_url}..")
-
-			try:
-				with open(filepath, 'rb') as f:
-					files = {'file': (filename, f, 'video/mp4')}
-					response = requests.post(server_url, files=files, timeout=60)
-
-				if response.status_code == 200:
-					print("Upload successful!")
-					if os.path.exists(filepath):
-						os.remove(filepath)
-						print(f"Deleted local file: {filepath}")
-				else:
-					print(f"Upload failed. Server returned: {response.status_code}")
-			except requests.exceptions.RequestException as e:
-				print(f"Network error during upload: {e}")
+			if response.status_code == 200:
+				print("Upload successful!")
+				if os.path.exists(filepath):
+					os.remove(filepath)
+					print(f"Deleted local file: {filepath}")
+			else:
+				print(f"Upload failed. Server returned: {response.status_code}")
+		except requests.exceptions.RequestException as e:
+			print(f"Network error during upload: {e}")
 

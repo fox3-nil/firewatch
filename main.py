@@ -81,9 +81,9 @@ def main(argv):
 		while True:
 
 			getSensorData(picam3, thermal_cam)
-			if(sys.argv[1] == "record"):
+			if(len(sys.argv) > 1 and sys.argv[1] == "record"):
 				print("Recording...")
-				camera.send_video(SERVER_URL, 5)
+				picam3.send_video(SERVER_URL, 5)
 			time.sleep(0.5)
 
 
