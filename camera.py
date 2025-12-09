@@ -43,46 +43,7 @@ class camera:
 		finally:
 			self.picam.stop()
 
-	def video_stream():
-		#RTMP_URL = "rtmp://x.x.x.x/live/mystream"
-		UDP_URL = "udp://192.168.1.50:1234"
-		WIDTH = 1280
-		HEIGHT = 720
-		FRAMERATE = 30
-		BITRATE = 2000000  # 2Mbps
-
-		def stream_video():
-			ffmpeg_cmd = [
-			'ffmpeg',
-			'-re',                        # Read input at native frame rate
-			'-f', 'h264',                 # Input format is raw H.264
-			'-i', 'pipe:0',               # Read from Stdin
-			'-c:v', 'copy',               # Copy the video stream (no re-encoding needed!)
-			'-an',                        # No audio
-			'-f', 'flv',                  # Output format (FLV is standard for RTMP)
-			#RTMP_URL
-			UDP_URL
-			]
-
-			# 2. Start the FFmpeg subprocess
-			# stdin=subprocess.PIPE allows us to write data to it
-			process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
-
-			# Configure video mode
-			config = picam2.create_video_configuration(
-			main={"size": (WIDTH, HEIGHT), "format": "XBGR8888"}, # Format doesn't strictly matter here as we use encoder output
-			controls={"FrameDurationLimits": (1000000 // FRAMERATE, 1000000 // FRAMERATE)}
-			)
-			picam2.configure(config)
-			picam2.start()
-
-			#print(f"Streaming to {RTMP_URL}...")
-			print(f"Streaming to {UDP_URL}")
-			print("Press Ctrl+C to stop.")
-
-			try:
-				# 4. The Loop: Capture and Write
-				# W
+	
 	def send_video(self, server_url, duration=5):
 		filename = f"video_{int(time.time())}.mp4"
 		filepath = os.path.join("/tmp", filename)
