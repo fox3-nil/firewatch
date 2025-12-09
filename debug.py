@@ -69,7 +69,7 @@ def main():
 				print("METHANE V OUTPUT ===============", GREEN + " [PASSED]" + RESET)
 			else:
 				print("METHANE V OUTPUT ===============", YELLOW + " [WARNING]" + RESET)
-			if 0.00 <= smoke <= 0.88:
+			if 0.00 <= smoke <= 0.5:
 				print("SMOKE V OUTPUT =================", GREEN + " [PASSED]" + RESET)
 			else:
 				print("SMOKE V OUTPUT =================", YELLOW + " [WARNING]" + RESET)

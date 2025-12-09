@@ -13,7 +13,7 @@ class camera:
         self.picam = Picamera2()
         self.still_config = self.picam.create_still_configuration(main={"size": (1920, 1080)})
         self.video_config = self.picam.create_video_configuration(
-            main={"size": (1920, 1080), "format": "XBGR8888"},
+            main={"size": (1280, 720), "format": "XBGR8888"},
             controls={"FrameDurationLimits": (33333, 33333)}
         )
 

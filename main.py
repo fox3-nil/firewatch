@@ -49,9 +49,9 @@ def getSensorData(NoIR,MLX):
 		"timestamp": "2025-12-09T02:25:00.000Z"
 	}
 
-	if itemp > 51.66 or etemp > 43.33 or vocs > 1.40 or ch4 > 2.00 or smoke > 0.88 or carbmono > 0.90:
+	if itemp > 51.66 or etemp > 43.33 or vocs > 1.40 or ch4 > 2.00 or smoke > 0.5 or carbmono > 0.90:
 		print("Recording...")
-		NoIR.send_video(SERVER_URL, 30)
+		NoIR.send_video(SERVER_URL, 9)
 
 	with open("readings.json", "w") as f:
 		json.dump(data, f, indent=4)
