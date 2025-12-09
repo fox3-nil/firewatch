@@ -116,7 +116,7 @@ class camera:
 				self.picam.stop_recording()
 
 			except Exception as e:
-				print(f"Error during recording: {e})
+				print(f"Error during recording: {e}")
 				return
 			finally:
 				self.picam.stop()

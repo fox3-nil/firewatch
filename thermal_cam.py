@@ -12,9 +12,9 @@ class thermal_camera:
 
 		#self.mlx.refresh_rate = adafruit_mlx90640.RefreshRate.REFRESH_2_HZ
 
-	def mlx_frame():
+	def mlx_frame(self):
 		print("Warming up thermal camera")
-		sleep(2)
+		time.sleep(2)
 		frame = [0] * 768
 		try:
 			while(True):

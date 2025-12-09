@@ -2,9 +2,9 @@ import os
 import sys
 import time
 import random
-#import internaltnh
-#import externaltnh
-#import memssuite_probe
+import internaltnh
+import externaltnh
+import memssuite_probe
 #import co_probe
 
 
@@ -14,10 +14,11 @@ def clear_screen():
 def get_sensor_values():
 
 	#THIS IS WHERE YOU READ SENSOR VALUES AND VERIFY THEIR OUTPUT
-#	aht20_t = internaltnh.get_temperature()
-#	aht20_h = internaltnh.get_humidity()
-#	cht832x_t, cht832x_h = externaltnh.sensor_oneshot()
-#	fermion_co, fermion_voc, fermion_smoke, fermion_methane = memssuite_probe.memssuite()
+	aht20_t = internaltnh.get_temperature()
+	aht20_h = internaltnh.get_humidity()
+	cht832x_t, cht832x_h = externaltnh.sensor_oneshot()
+	fermion_co, fermion_voc, fermion_smoke, fermion_methane = memssuite_probe.memssuite()
+	'''
 	aht20_t = random.uniform(20.00, 55.00)
 	aht20_h = random.uniform(45.00, 47.00)
 	cht832x_t = random.uniform(10, 15)
@@ -26,8 +27,9 @@ def get_sensor_values():
 	fermion_meth = random.uniform(0.4, 3.3)
 	fermion_smoke = random.uniform(0.4, 3.3)
 	fermion_co = random.uniform(0.4, 3.3)
+	'''
 	batterylvl = random.randint(1, 100)
-	return aht20_t, aht20_h, cht832x_t, cht832x_h, fermion_voc, fermion_meth, fermion_smoke, fermion_co, batterylvl
+	return aht20_t, aht20_h, cht832x_t, cht832x_h, fermion_voc, fermion_methane, fermion_smoke, fermion_co, batterylvl
 
 def main():
 

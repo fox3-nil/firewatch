@@ -1,3 +1,4 @@
+
 # Probe code for full gas sensor suite (ct 4) probing
 
 import time
@@ -17,25 +18,35 @@ def memssuite():
 	smk_channel = AnalogIn(ads, ads1x15.Pin.A2)
 	ch4_channel = AnalogIn(ads, ads1x15.Pin.A3)
 
-	ads.gain = 1
+	#ads.gain = 1 #3.3VCC
+	ads.gain = 2/3 #5VCC
 
-	print("MEMs sensor suite initialized")
-	print("-" * 50)
+	#print("MEMs sensor suite initialized")
+	#print("-" * 50)
+
 
 	try:
-		print("Probing mems sensors...")
-
+		#print("Probing mems sensors...")
+		time.sleep(0.5)
 		'''
+
 		while True:
 			print("-" * 50)
-			print(f"CO SENSING: raw Value: {co_channel.value} | Voltage: {co_channel.voltage: .6f} V")
-			print(f"VOC SENSING: raw Value: {voc_channel.value} | Voltage: {voc_channel.voltage: .6f} V")
-			print(f"SMK SENSING: raw Value: {smk_channel.value} | Voltage: {smk_channel.voltage: .6f} V")
-			print(f"CH4 SENSING: raw Value: {ch4_channel.value} | Voltage: {ch4_channel.voltage: .6f} V")
+			print(f"CO SENSING: raw Value: {co_channel.value} | Voltage: {co_channel.voltage: .4f} V")
+			print(f"VOC SENSING: raw Value: {voc_channel.value} | Voltage: {voc_channel.voltage: .4f} V")
+			print(f"SMK SENSING: raw Value: {smk_channel.value} | Voltage: {smk_channel.voltage: .4f} V")
+			print(f"CH4 SENSING: raw Value: {ch4_channel.value} | Voltage: {ch4_channel.voltage: .4f} V")
 			print("-" * 50)
 			time.sleep(2.0)
-        	'''
+		'''
 	except KeyboardInterrupt:
         	print("Probing ceased.")
+	finally:
 
-	return co_channel.voltage, voc_channel.voltage, smk_channel.voltage, ch4_channel.voltage
+		return co_channel.voltage, voc_channel.voltage, smk_channel.voltage, ch4_channel.voltage
+
+def main():
+	memssuite()
+
+if __name__ == "__main__":
+	main()
