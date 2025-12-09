@@ -34,33 +34,34 @@ class camera:
 
     def send_video(self, server_url, duration=5):
         filename = f"video_{int(time.time())}.mp4"
-        # Changed to /tmp to avoid permission errors
-        filepath = os.path.join("/tmp", filename) 
+        filepath = os.path.join("/tmp", filename)
 
         try:
             print(f"Recording video to {filepath}...")
+            # 1. Configure the camera
             self.picam.configure(self.video_config)
             
-            # Prepare the output object
-            output = FfmpegOutput(filepath)
+            # 2. Start and record directly to the file path
+            # This method correctly handles the encoder and output internally
+            # It records for the specified duration or until stop_recording() is called.
+            self.picam.start_and_record_video(filepath, duration=duration)
             
-            # Start recording using the output object
-            self.picam.start_recording(output)
-            
-            self.picam.wait(duration)
-            self.picam.stop_recording()
+            # Since duration is passed, it internally stops the recording after that time.
+            # Explicitly calling stop_recording is often unnecessary here, but 
+            # we must call self.picam.stop() to release the camera.
 
         except Exception as e:
-            # This print will help us see exactly what fails
+            # Removed the original error handling block for brevity, but you should keep it.
             print(f"CRITICAL ERROR during recording: {e}")
             import traceback
-            traceback.print_exc() 
+            traceback.print_exc()
             return
         finally:
-            self.picam.stop()
+            self.picam.stop() # Always stop the camera after the operation is complete
 
+        # --- Upload Logic (remains the same) ---
         print(f"Uploading to {server_url}..")
-
+        # ... (rest of the upload code)
         try:
             with open(filepath, 'rb') as f:
                 files = {'file': (filename, f, 'video/mp4')}
@@ -68,9 +69,6 @@ class camera:
 
             if response.status_code == 200:
                 print("Upload successful!")
-                # Optional: delete file after upload
-                # if os.path.exists(filepath):
-                #     os.remove(filepath)
             else:
                 print(f"Upload failed. Server returned: {response.status_code}")
         except requests.exceptions.RequestException as e:
