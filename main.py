@@ -30,6 +30,7 @@ def getSensorData(NoIR,MLX):
 	time.sleep(5)
 	speed_ms, speed_mph, frequency = anemometer.calculate_wind_speed()
 	'''
+
 	data = {
 		"mac": get_mac(),
 		"temp_internal_c": float(f"{itemp:.2f}"),
@@ -47,6 +48,10 @@ def getSensorData(NoIR,MLX):
 		"wind_speed_mph": 100,
 		"timestamp": "2025-12-09T02:25:00.000Z"
 	}
+
+	if itemp <= 51.66 or etemp <= 43.33 or 0.00 <= vocs <= 1.40 or 0.00 <= ch4 <= 2.00 or 0.00 <= smoke <= 0.88 or 0.00 <= carbmono <= 0.90:
+		print("Recording...")
+		NoIR.send_video(SERVER_URL, 30)
 
 	with open("readings.json", "w") as f:
 		json.dump(data, f, indent=4)
@@ -81,9 +86,7 @@ def main(argv):
 		while True:
 
 			getSensorData(picam3, thermal_cam)
-			if(len(sys.argv) > 1 and sys.argv[1] == "record"):
-				print("Recording...")
-				picam3.send_video(SERVER_URL, 10)
+			
 			time.sleep(5)
 
 
