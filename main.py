@@ -83,8 +83,8 @@ def main(argv):
 			getSensorData(picam3, thermal_cam)
 			if(len(sys.argv) > 1 and sys.argv[1] == "record"):
 				print("Recording...")
-				picam3.send_video(SERVER_URL, 5)
-			time.sleep(0.5)
+				picam3.send_video(SERVER_URL, 10)
+			time.sleep(5)
 
 
 	except KeyboardInterrupt:
