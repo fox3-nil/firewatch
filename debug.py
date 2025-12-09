@@ -59,19 +59,19 @@ def main():
 				print("CHT832X Temperature ============", GREEN + " [PASSED]" + RESET)
 			else:
 				print("CHT832X Temperature ============", YELLOW + " [WARNING]" + RESET)
-			if 0.00 <= vocs <= 2.50:
+			if 0.00 <= vocs <= 1.40:
 				print("VOC V OUTPUT ===================", GREEN + " [PASSED]" + RESET)
 			else:
 				print("VOC V OUTPUT ===================", YELLOW + " [WARNING]" + RESET)
-			if 0.00 <= methane <= 2.50:
+			if 0.00 <= methane <= 1.30:
 				print("METHANE V OUTPUT ===============", GREEN + " [PASSED]" + RESET)
 			else:
 				print("METHANE V OUTPUT ===============", YELLOW + " [WARNING]" + RESET)
-			if 0.00 <= smoke <= 2.50:
+			if 0.00 <= smoke <= 0.88:
 				print("SMOKE V OUTPUT =================", GREEN + " [PASSED]" + RESET)
 			else:
 				print("SMOKE V OUTPUT =================", YELLOW + " [WARNING]" + RESET)
-			if 0.00 <= carbmono <= 2.50:
+			if 0.00 <= carbmono <= 0.41:
 				print("CARBON MONOXIDE V OUTPUT =======", GREEN + " [PASSED]" + RESET)
 			else:
 				print("CARBON MONOXIDE V OUTPUT =======", YELLOW + " [WARNING]" + RESET)
