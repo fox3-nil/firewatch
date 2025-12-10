@@ -1,17 +1,17 @@
 import RPi.GPIO as GPIO
-import board
+#import board
 import time
 from adafruit_ads1x15 import ADS1015, AnalogIn, ads1x15
 import math
 
-i2c = board.I2C()
-ads_anemometer = ADS1015(i2c,gain = 2/3, address=0x49) #alternate address
+#i2c = board.I2C()
+#ads_anemometer = ADS1015(i2c,gain = 2/3, address=0x49) #alternate address
 
-wind_vane = AnalogIn(ads_anemometer, ads1x15.Pin.A0)
+#wind_vane = AnalogIn(ads_anemometer, ads1x15.Pin.A0)
 
 Anemometer_PIN = 17 #GPIO Pin on raspi
 
-measure_interval = 3 #Time given to measure pulses from speed sensor
+measure_interval = 5 #Time given to measure pulses from speed sensor
 
 #GPIO channels used for the anemometer
 GPIO.setmode(GPIO.BCM)
@@ -24,27 +24,27 @@ K = 0.667 #conversion constant from mph to m/s
 #Global variable to store pulse count to use as interrupt
 pulse_count = 0
 last_event_time = time.time() #Used for debouncing
-
+'''
 def wind_vane_direction():
     V_IN = 5.0
     R2 = 10000 #static transistor
     wind_vane_angle = {
 		#Resistance : Angle
-		33000.0 : 0,
+		33000.0 : 0, #North
 		6570.0 : 22.5,
 		8200.0 : 45,
 		891.0 : 67.5,
-		1000.0 : 90,
+		1000.0 : 90, #East
 		688.0 : 112.5,
 		2200.0 : 135,
 		1410.0 : 157.5,
-		3900.0 : 180,
+		3900.0 : 180, #South
 		3140.0 : 202.5,
 		16000.0 : 225,
-		14120.0 : 247.5,
-		120000.0 : 270,
-		42120.0 : 292.5,
-		64900.0 : 315,
+		14120.0 : 247.5,#ERROR
+		120000.0 : 270, #West ERROR
+		42120.0 : 292.5,#ERROR
+		64900.0 : 315, #ERROR
 		21880.0 : 337.5,
 	}
     
@@ -55,6 +55,8 @@ def wind_vane_direction():
     return wind_vane_angle[key_r]
 
 def closest_resistance(R1, direction_key):
+'''
+'''
     closest_resistance = None
     min_difference = float('inf')
      
@@ -91,33 +93,33 @@ def calculate_wind_speed():
 	pulse_count = 0
 
 	return wind_speed_ms, wind_speed_mph, frequency_hz
-	'''
+	
 try:
-	#GPIO.add_event_detect(
-    #	    Anemometer_PIN, 
-    #	    GPIO.FALLING, 
-    #	    callback=spin_callback, 
-    #	   bouncetime=20
-    #	)
-	#print(f"--- Wind Speed Monitor Initialized ---")
-	#print(f"Monitoring BCM Pin {Anemometer_PIN} every {measure_interval} seconds.")
+	GPIO.add_event_detect(
+    	    Anemometer_PIN, 
+    	    GPIO.FALLING, 
+    	    callback=spin_callback, 
+    	   bouncetime=20
+    	)
+	print(f"--- Wind Speed Monitor Initialized ---")
+	print(f"Monitoring BCM Pin {Anemometer_PIN} every {measure_interval} seconds.")
 
 	while True:
 		# Wait for the defined measurement interval
 		time.sleep(measure_interval)
 		# Perform calculation
-		#speed_ms, speed_mph, frequency = calculate_wind_speed()
+		speed_ms, speed_mph, frequency = calculate_wind_speed()
 		# Print results
-		current_angle = wind_vane_direction()
-		print(f"--Current Angle: {current_angle:.2f} degrees")
-		# print(f"--- Measurement ({time.strftime('%H:%M:%S')}) ---")
-		#print(f"Pulse Frequency: {frequency:.2f} Hz")
-		#print(f"Wind Speed: **{speed_ms:.2f} m/s** ({speed_mph:.2f} MPH)")
+		#current_angle = wind_vane_direction()
+		#print(f"--Current Angle: {current_angle:.2f} degrees")
+		print(f"--- Measurement ({time.strftime('%H:%M:%S')}) ---")
+		print(f"Pulse Frequency: {frequency:.2f} Hz")
+		print(f"Wind Speed: **{speed_ms:.2f} m/s** ({speed_mph:.2f} MPH)")
         
 except KeyboardInterrupt:
     print("\nMeasurement stopped by user.")
 
-#finally:
-    # Always clean up the GPIO settings when the script finishes
-    #GPIO.cleanup()
-    #print("GPIO cleanup complete.")
+finally:
+    #Always clean up the GPIO settings when the script finishes
+    GPIO.cleanup()
+    print("GPIO cleanup complete.")
