@@ -51,7 +51,7 @@ def wind_vane_direction():
     measured_R = (wind_vane.voltage * R2) / (V_IN - wind_vane.voltage) #
     
     key_r = closest_resistance(measured_R, wind_vane_angle)
-    
+    print(f"Measured Resistance {measured_R:.1f}")
     return wind_vane_angle[key_r]
 
 def closest_resistance(R1, direction_key):
