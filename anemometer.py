@@ -11,7 +11,7 @@ wind_vane = AnalogIn(ads_anemometer, ads1x15.Pin.A0)
 
 Anemometer_PIN = 17 #GPIO Pin on raspi
 
-measure_interval = 5 #Time given to measure pulses from speed sensor
+measure_interval = 3 #Time given to measure pulses from speed sensor
 
 #GPIO channels used for the anemometer
 GPIO.setmode(GPIO.BCM)
@@ -109,7 +109,7 @@ try:
 		#speed_ms, speed_mph, frequency = calculate_wind_speed()
 		# Print results
 		current_angle = wind_vane_direction()
-		print(f"--Current Angle: {current_angle} degrees")
+		print(f"--Current Angle: {current_angle:.2f} degrees")
 		# print(f"--- Measurement ({time.strftime('%H:%M:%S')}) ---")
 		#print(f"Pulse Frequency: {frequency:.2f} Hz")
 		#print(f"Wind Speed: **{speed_ms:.2f} m/s** ({speed_mph:.2f} MPH)")
