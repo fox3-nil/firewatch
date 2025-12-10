@@ -8,6 +8,7 @@ measure_interval = 5 #Time given to measure pulses from speed sensor
 
 #GPIO channels used for the anemometer
 GPIO.setmode(GPIO.BCM)
+GPIO.cleanup()
 GPIO.setup(Anemometer_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP) #setup GPIO channel for anemometer
 
 
@@ -51,6 +52,9 @@ try:
     	    callback=spin_callback, 
      	   bouncetime=20
     	)
+	print(f"--- Wind Speed Monitor Initialized ---")
+	print(f"Monitoring BCM Pin {Anemometer_PIN} every {measure_interval} seconds.")
+    
 	while True:
         # Wait for the defined measurement interval
 		time.sleep(measure_interval)
