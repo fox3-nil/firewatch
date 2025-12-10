@@ -65,7 +65,7 @@ def closest_resistance(R1, direction_key):
              min_difference = current_difference
              closest_resistance = key_r
     return closest_resistance
-
+'''
 def spin_callback(channel): #interrupt to count pulse_count
 	global pulse_count, last_event_time
 
@@ -91,35 +91,33 @@ def calculate_wind_speed():
 	pulse_count = 0
 
 	return wind_speed_ms, wind_speed_mph, frequency_hz
-
+	'''
 try:
-	GPIO.add_event_detect(
-    	    Anemometer_PIN, 
-    	    GPIO.FALLING, 
-    	    callback=spin_callback, 
-     	   bouncetime=20
-    	)
-	print(f"--- Wind Speed Monitor Initialized ---")
-	print(f"Monitoring BCM Pin {Anemometer_PIN} every {measure_interval} seconds.")
-    
+	#GPIO.add_event_detect(
+    #	    Anemometer_PIN, 
+    #	    GPIO.FALLING, 
+    #	    callback=spin_callback, 
+    #	   bouncetime=20
+    #	)
+	#print(f"--- Wind Speed Monitor Initialized ---")
+	#print(f"Monitoring BCM Pin {Anemometer_PIN} every {measure_interval} seconds.")
+
 	while True:
-        # Wait for the defined measurement interval
+		# Wait for the defined measurement interval
 		time.sleep(measure_interval)
-        
-        # Perform calculation
-		speed_ms, speed_mph, frequency = calculate_wind_speed()
-  
+		# Perform calculation
+		#speed_ms, speed_mph, frequency = calculate_wind_speed()
+		# Print results
 		current_angle = wind_vane_direction()
-        # Print results
 		print(f"--Current Angle: {current_angle} degrees")
-        # print(f"--- Measurement ({time.strftime('%H:%M:%S')}) ---")
-		print(f"Pulse Frequency: {frequency:.2f} Hz")
-		print(f"Wind Speed: **{speed_ms:.2f} m/s** ({speed_mph:.2f} MPH)")
+		# print(f"--- Measurement ({time.strftime('%H:%M:%S')}) ---")
+		#print(f"Pulse Frequency: {frequency:.2f} Hz")
+		#print(f"Wind Speed: **{speed_ms:.2f} m/s** ({speed_mph:.2f} MPH)")
         
 except KeyboardInterrupt:
     print("\nMeasurement stopped by user.")
 
-finally:
+#finally:
     # Always clean up the GPIO settings when the script finishes
-    GPIO.cleanup()
-    print("GPIO cleanup complete.")
+    #GPIO.cleanup()
+    #print("GPIO cleanup complete.")
