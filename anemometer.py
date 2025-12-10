@@ -1,7 +1,7 @@
 import RPi.GPIO as GPIO
 #import board
 import time
-from adafruit_ads1x15 import ADS1015, AnalogIn, ads1x15
+#from adafruit_ads1x15 import ADS1015, AnalogIn, ads1x15
 import math
 
 #i2c = board.I2C()
