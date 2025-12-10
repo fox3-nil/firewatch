@@ -2,11 +2,10 @@ import os
 import sys
 import time
 import random
-#import internaltnh
-#import externaltnh
-#import memssuite_probe
+import internaltnh
+import externaltnh
+import memssuite_probe
 import serial
-#import co_probe
 
 
 def clear_screen():
