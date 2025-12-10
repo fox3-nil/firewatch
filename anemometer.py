@@ -5,7 +5,7 @@ from adafruit_ads1x15 import ADS1015, AnalogIn, ads1x15
 import math
 
 i2c = board.I2C()
-ads_anemometer = ADS1015(i2c,gain = 2/3, address=0x4B) #alternate address
+ads_anemometer = ADS1015(i2c,gain = 2/3, address=0x49) #alternate address
 
 wind_vane = AnalogIn(ads_anemometer, ads1x15.A0)
 
