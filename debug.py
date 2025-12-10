@@ -5,7 +5,7 @@ import random
 import internaltnh
 import externaltnh
 import memssuite_probe
-#import co_probe
+#import anemometer
 
 '''
 def clear_screen():
@@ -18,6 +18,7 @@ def get_sensor_values():
 	aht20_h = internaltnh.get_humidity()
 	cht832x_t, cht832x_h = externaltnh.sensor_oneshot()
 	fermion_co, fermion_voc, fermion_smoke, fermion_methane = memssuite_probe.memssuite()
+
 	'''
 	aht20_t = random.uniform(20.00, 55.00)
 	aht20_h = random.uniform(45.00, 47.00)
@@ -28,8 +29,9 @@ def get_sensor_values():
 	fermion_smoke = random.uniform(0.4, 3.3)
 	fermion_co = random.uniform(0.4, 3.3)
 	'''
+	windspd = random.uniform(0, 5)
 	batterylvl = random.randint(1, 100)
-	return aht20_t, aht20_h, cht832x_t, cht832x_h, fermion_voc, fermion_methane, fermion_smoke, fermion_co, batterylvl
+	return aht20_t, aht20_h, cht832x_t, cht832x_h, fermion_voc, fermion_methane, fermion_smoke, fermion_co, windspd, batterylvl
 
 def main():
 
@@ -39,7 +41,7 @@ def main():
 
 	try:
 		while True:
-			itemp, ihumd, etemp, ehumd, vocs, methane, smoke, carbmono, battery = get_sensor_values()
+			itemp, ihumd, etemp, ehumd, vocs, methane, smoke, carbmono, windspeed, battery = get_sensor_values()
 
 			#clear_screen()
 			print("\n=== SENSOR DEBUGGING TEST ===")
@@ -51,6 +53,8 @@ def main():
 			print(f"Fermion Methane Vout:  {methane:.2f} V")
 			print(f"Fermion Smoke Vout:    {smoke:.2f} V")
 			print(f"Fermion CO Vout:       {carbmono:.2f} V")
+			print(f"Wind Speed:            {windspeed:.2f} MPH")
+			print(f"Wind Direction:        N")
 			print(f"Battery Level:         {battery} %\n")
 			print("      === RESULTS ===\n")
 			if itemp <= 51.66:

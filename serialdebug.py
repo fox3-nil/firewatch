@@ -44,7 +44,7 @@ def main():
 		while True:
 			itemp, ihumd, etemp, ehumd, vocs, methane, smoke, carbmono, battery = get_sensor_values()
 
-			clear_screen()
+
 			serial_print("\n=== SENSOR DEBUGGING TEST ===")
 			serial_print(f"AHT20 Temperature:     {itemp:.2f} °C")
 			serial_print(f"AHT20 Humidity:        {ihumd:.2f} %")
