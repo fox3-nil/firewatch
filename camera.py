@@ -60,12 +60,12 @@ class camera:
             self.picam.stop() # Always stop the camera after the operation is complete
 
         # --- Upload Logic (remains the same) ---
-        print(f"Uploading to {server_url}..")
+        print(f"Uploading video to {server_url}..")
         # ... (rest of the upload code)
         try:
             with open(filepath, 'rb') as f:
                 files = {'file': (filename, f, 'video/mp4')}
-                response = requests.post(server_url, files=files, timeout=60)
+                response = requests.post(server_url, files=files, timeout=30)
 
             if response.status_code == 200:
                 print("Upload successful!")

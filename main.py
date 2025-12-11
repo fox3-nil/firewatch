@@ -12,11 +12,9 @@ import memssuite_probe
 import sys
 #import anemometer
 
-#test comment
-
-#SERVER_URL = "http://f-star.org:8080"
-SERVER_URL = "http://10.125.161.153:8080"
-
+#SERVER_URL = "http://f-star.org:8443"
+#SERVER_URL = "http://3.16.139.181:8443"
+SERVER_URL = "http://10.125.156.142"
 
 def getSensorData(NoIR,MLX):
 	time.sleep(1)
@@ -57,7 +55,7 @@ def getSensorData(NoIR,MLX):
 		json.dump(data, f, indent=4)
 
 	try:
-		print(f"Connecting to {SERVER_URL}")
+		print(f"Sending readings.json to {SERVER_URL}")
 		response = requests.post(SERVER_URL,json=data)
 
 		if response.status_code == 200:
@@ -86,7 +84,6 @@ def main(argv):
 		while True:
 
 			getSensorData(picam3, thermal_cam)
-			
 			time.sleep(10)
 
 

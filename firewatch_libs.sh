@@ -31,7 +31,7 @@ echo "[3/7] Updating apt..."
 sudo apt update
 
 echo "[4/7] Installing system packages..."
-sudo apt install -y python3-pip python3-smbus i2c-tools python3-pil libcamera-tools python3-libcamera
+sudo apt install -y python3-pip python3-smbus i2c-tools python3-pil libcamera-tools python3-libcamera requests
 
 echo "[5/7] Upgrading pip..."
 pip3 install --upgrade pip
